@@ -1,0 +1,9 @@
+name = "kitchen-rota"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kitchen-rota-db"
+database_id = "YOUR_D1_DATABASE_ID" # User needs to fill this after creation

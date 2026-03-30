@@ -38,6 +38,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          roomNumber: user.roomNumber,
           image: user.image,
         };
       },
@@ -45,13 +46,14 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 365 * 24 * 60 * 60, // 365 days
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
-        token.role = user.role;
+        token.id = user.id as string;
+        token.role = (user as any).role;
+        token.roomNumber = (user as any).roomNumber;
       }
       return token;
     },
@@ -59,6 +61,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.roomNumber = token.roomNumber as number;
       }
       return session;
     },

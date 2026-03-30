@@ -1,23 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Card } from '@/components/ui/Card';
 import toast from 'react-hot-toast';
+import type { User } from '@/types';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [takenRooms, setTakenRooms] = useState<number[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     confirmPassword: '',
+    roomNumber: '',
   });
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchTakenRooms() {
+      try {
+        const response = await fetch('/api/users');
+        if (response.ok) {
+          const users: User[] = await response.json();
+          const rooms = users
+            .map((u) => u.roomNumber)
+            .filter((r): r is number => r !== null);
+          setTakenRooms(rooms);
+        }
+      } catch (err) {
+        console.error('Failed to fetch rooms:', err);
+      }
+    }
+    fetchTakenRooms();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +55,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!formData.roomNumber) {
+      setError('Please select a room number');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -43,6 +70,7 @@ export default function RegisterPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
+          roomNumber: parseInt(formData.roomNumber),
         }),
       });
 
@@ -120,6 +148,23 @@ export default function RegisterPage() {
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
               required
               disabled={isLoading}
+            />
+
+            <Select
+              id="roomNumber"
+              label="Room Number"
+              value={formData.roomNumber}
+              onChange={(e) => setFormData({ ...formData, roomNumber: e.target.value })}
+              required
+              disabled={isLoading}
+              options={[
+                { value: '', label: 'Select your room...' },
+                ...Array.from({ length: 11 }, (_, i) => i + 1).map((num) => ({
+                  value: num.toString(),
+                  label: `Room ${num}${takenRooms.includes(num) ? ' (Taken)' : ''}`,
+                  disabled: takenRooms.includes(num),
+                })),
+              ]}
             />
 
             {error && (

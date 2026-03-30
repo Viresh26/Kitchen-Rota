@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -12,15 +13,16 @@ import type { CleaningTask } from '@/types';
 import toast from 'react-hot-toast';
 
 export default function TasksPage() {
+  const { data: session } = useSession();
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const isAdmin = session?.user?.role === 'ADMIN';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<CleaningTask | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     frequency: 'WEEKLY',
-    duration: 30,
     priority: 'MEDIUM',
   });
 
@@ -63,7 +65,7 @@ export default function TasksPage() {
       toast.success(editingTask ? 'Task updated successfully' : 'Task created successfully');
       setIsModalOpen(false);
       setEditingTask(null);
-      setFormData({ name: '', description: '', frequency: 'WEEKLY', duration: 30, priority: 'MEDIUM' });
+      setFormData({ name: '', description: '', frequency: 'WEEKLY', priority: 'MEDIUM' });
       fetchTasks();
     } catch (error) {
       console.error('Save task error:', error);
@@ -95,7 +97,6 @@ export default function TasksPage() {
       name: task.name,
       description: task.description || '',
       frequency: task.frequency,
-      duration: task.duration,
       priority: task.priority,
     });
     setIsModalOpen(true);
@@ -103,7 +104,7 @@ export default function TasksPage() {
 
   function openCreateModal() {
     setEditingTask(null);
-    setFormData({ name: '', description: '', frequency: 'WEEKLY', duration: 30, priority: 'MEDIUM' });
+    setFormData({ name: '', description: '', frequency: 'WEEKLY', priority: 'MEDIUM' });
     setIsModalOpen(true);
   }
 
@@ -122,12 +123,14 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold text-neutral-900">Cleaning Tasks</h1>
           <p className="text-neutral-600 mt-1">Manage your cleaning tasks and responsibilities</p>
         </div>
-        <Button onClick={openCreateModal}>
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Task
-        </Button>
+        {isAdmin && (
+          <Button onClick={openCreateModal}>
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Task
+          </Button>
+        )}
       </div>
 
       {tasks.length === 0 ? (
@@ -138,7 +141,7 @@ export default function TasksPage() {
             </svg>
             <h3 className="text-lg font-medium text-neutral-900 mb-2">No tasks yet</h3>
             <p className="text-neutral-500 mb-4">Get started by creating your first cleaning task</p>
-            <Button onClick={openCreateModal}>Create Task</Button>
+            {isAdmin && <Button onClick={openCreateModal}>Create Task</Button>}
           </div>
         </Card>
       ) : (
@@ -164,22 +167,18 @@ export default function TasksPage() {
                   </svg>
                   {getFrequencyLabel(task.frequency)}
                 </div>
-                <div className="flex items-center text-sm text-neutral-600">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {task.duration} minutes
-                </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => openEditModal(task)}>
-                  Edit
-                </Button>
-                <Button variant="danger" size="sm" onClick={() => handleDelete(task)}>
-                  Delete
-                </Button>
-              </div>
+              {isAdmin && (
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => openEditModal(task)}>
+                    Edit
+                  </Button>
+                  <Button variant="danger" size="sm" onClick={() => handleDelete(task)}>
+                    Delete
+                  </Button>
+                </div>
+              )}
             </Card>
           ))}
         </div>
@@ -226,19 +225,11 @@ export default function TasksPage() {
             onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
             options={[
               { value: 'DAILY', label: 'Daily' },
+              { value: 'TWICE_WEEKLY', label: 'Twice a week' },
               { value: 'WEEKLY', label: 'Weekly' },
               { value: 'BIWEEKLY', label: 'Bi-weekly' },
               { value: 'MONTHLY', label: 'Monthly' },
             ]}
-          />
-          
-          <Input
-            label="Duration (minutes)"
-            type="number"
-            value={formData.duration}
-            onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) || 30 })}
-            min={5}
-            max={180}
           />
           
           <Select

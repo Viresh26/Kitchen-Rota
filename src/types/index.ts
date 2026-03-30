@@ -8,6 +8,7 @@ declare module 'next-auth' {
       email: string;
       name: string;
       role: string;
+      roomNumber?: number | null;
       image?: string | null;
     };
   }
@@ -17,6 +18,7 @@ declare module 'next-auth' {
     email: string;
     name: string;
     role: string;
+    roomNumber?: number | null;
     image?: string | null;
   }
 }
@@ -25,6 +27,7 @@ declare module 'next-auth/jwt' {
   interface JWT {
     id: string;
     role: string;
+    roomNumber?: number | null;
   }
 }
 
@@ -32,8 +35,7 @@ export interface CleaningTask {
   id: string;
   name: string;
   description: string | null;
-  frequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-  duration: number;
+  frequency: 'DAILY' | 'TWICE_WEEKLY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
   priority: 'LOW' | 'MEDIUM' | 'HIGH';
   active: boolean;
   createdAt: Date;
@@ -41,36 +43,8 @@ export interface CleaningTask {
   createdById: string;
 }
 
-export interface Assignment {
-  id: string;
-  taskId: string;
-  userId: string;
-  scheduleId: string;
-  dueDate: Date;
-  completed: boolean;
-  verified: boolean;
-  verifiedBy: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  task?: CleaningTask;
-  user?: User;
-}
-
-export interface Schedule {
-  id: string;
-  name: string;
-  description: string | null;
-  startDate: Date;
-  endDate: Date | null;
-  rotationType: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface Completion {
   id: string;
-  assignmentId: string;
   taskId: string;
   userId: string;
   completedAt: Date;
@@ -79,6 +53,7 @@ export interface Completion {
   verifiedBy: string | null;
   verifiedAt: Date | null;
   task?: CleaningTask;
+  user?: User;
 }
 
 export interface Notification {
@@ -97,6 +72,7 @@ export interface User {
   email: string;
   name: string;
   role: 'USER' | 'ADMIN';
+  roomNumber: number | null;
   image: string | null;
   createdAt: Date;
   updatedAt: Date;

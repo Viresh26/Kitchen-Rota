@@ -46,6 +46,7 @@ export function isDateOverdue(date: Date | string): boolean {
 export function getFrequencyLabel(frequency: string): string {
   const labels: Record<string, string> = {
     DAILY: 'Daily',
+    TWICE_WEEKLY: 'Twice a week',
     WEEKLY: 'Weekly',
     BIWEEKLY: 'Bi-weekly',
     MONTHLY: 'Monthly',
@@ -74,6 +75,7 @@ export function getPriorityColor(priority: string): string {
 export function getRotationTypeLabel(rotationType: string): string {
   const labels: Record<string, string> = {
     DAILY: 'Daily',
+    TWICE_WEEKLY: 'Twice a week',
     WEEKLY: 'Weekly',
     BIWEEKLY: 'Bi-weekly',
     MONTHLY: 'Monthly',

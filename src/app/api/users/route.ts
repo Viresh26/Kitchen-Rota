@@ -9,6 +9,7 @@ const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  roomNumber: z.number().min(1).max(11).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -53,7 +54,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, email, password } = validation.data;
+    const { name, email, password, roomNumber } = validation.data;
+
+    if (!roomNumber) {
+      return NextResponse.json(
+        { error: 'Room number is compulsory' },
+        { status: 400 }
+      );
+    }
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -67,6 +75,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if room number is already taken
+    if (roomNumber) {
+      const existingRoom = await prisma.user.findUnique({
+        where: { roomNumber },
+      });
+
+      if (existingRoom) {
+        return NextResponse.json(
+          { error: 'This room number is already registered' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -76,6 +98,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         password: hashedPassword,
+        roomNumber,
       },
     });
 
@@ -85,6 +108,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         name: user.name,
         role: user.role,
+        roomNumber: user.roomNumber,
       },
       { status: 201 }
     );

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { startOfWeek, endOfWeek, addWeeks, format } from 'date-fns';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,67 +20,118 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Get total tasks
-    const totalTasks = await prisma.cleaningTask.count({
-      where: { active: true },
-    });
-
-    // Get assignments for this user
-    const userAssignments = await prisma.assignment.findMany({
-      where: { userId: user.id },
-      include: { task: true },
-    });
-
-    const completedTasks = userAssignments.filter(a => a.completed).length;
-    const pendingTasks = userAssignments.filter(a => !a.completed).length;
-    
+    // --- Automated Duty Rotation Logic ---
     const now = new Date();
-    const overdueTasks = userAssignments.filter(
-      a => !a.completed && new Date(a.dueDate) < now
-    ).length;
+    const currentWeekStr = format(now, "yyyy-'W'II"); // e.g. 2026-W14
+    
+    // Fetch all duty settings at once
+    const allSettings = await prisma.settings.findMany({
+      where: { key: { in: ['current_duty_room', 'duty_room_numbers', 'duty_paused_rooms', 'last_rotation_week'] } }
+    });
+    
+    const getVal = (key: string) => {
+      const s = allSettings.find(item => item.key === key);
+      return s ? JSON.parse(s.value) : null;
+    };
 
-    // Get total users
-    const totalUsers = await prisma.user.count();
+    let currentRoom = getVal('current_duty_room');
+    const pool = getVal('duty_room_numbers') || [];
+    const paused = getVal('duty_paused_rooms') || [];
+    const lastWeek = getVal('last_rotation_week');
 
-    // Calculate completion rate
-    const completionRate = userAssignments.length > 0
-      ? Math.round((completedTasks / userAssignments.length) * 100)
-      : 0;
+    // If it's a new week and we have a pool, rotate!
+    if (currentWeekStr !== lastWeek && pool.length > 0) {
+      let nextIndex = 0;
+      if (currentRoom !== null) {
+        const currentIndex = pool.indexOf(currentRoom);
+        nextIndex = (currentIndex + 1) % pool.length;
+      }
+      
+      // Skip paused rooms
+      let attempts = 0;
+      while (paused.includes(pool[nextIndex]) && attempts < pool.length) {
+        nextIndex = (nextIndex + 1) % pool.length;
+        attempts++;
+      }
 
-    // Get recent completions
-    const recentCompletions = await prisma.completion.findMany({
-      where: { userId: user.id },
-      include: {
-        task: true,
-      },
-      orderBy: { completedAt: 'desc' },
-      take: 5,
+      const nextRoom = pool[nextIndex];
+      
+      // Update settings in DB
+      await prisma.$transaction([
+        prisma.settings.upsert({
+          where: { key: 'current_duty_room' },
+          update: { value: JSON.stringify(nextRoom) },
+          create: { key: 'current_duty_room', value: JSON.stringify(nextRoom) }
+        }),
+        prisma.settings.upsert({
+          where: { key: 'last_rotation_week' },
+          update: { value: JSON.stringify(currentWeekStr) },
+          create: { key: 'last_rotation_week', value: JSON.stringify(currentWeekStr) }
+        })
+      ]);
+      
+      currentRoom = nextRoom;
+      console.log(`Rotated duty to Room ${currentRoom} for week ${currentWeekStr}`);
+    }
+    // --------------------------------------
+    
+    // Find the user currently on duty
+    let onDutyUser = null;
+    if (currentRoom) {
+      onDutyUser = await prisma.user.findFirst({
+        where: { roomNumber: currentRoom },
+        select: { id: true, name: true, roomNumber: true }
+      });
+    }
+
+    const isUserOnDuty = onDutyUser?.id === user.id;
+
+    // Get tasks for the current duty (active tasks)
+    const activeTasks = await prisma.cleaningTask.findMany({
+      where: { active: true }
     });
 
-    // Get upcoming assignments
-    const upcomingAssignments = await prisma.assignment.findMany({
+    // Get completions for this week (Monday to Sunday)
+    const start = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const end = endOfWeek(new Date(), { weekStartsOn: 1 });
+    
+    // Last week (for public view)
+    const lastStart = startOfWeek(addWeeks(new Date(), -1), { weekStartsOn: 1 });
+    const lastEnd = endOfWeek(addWeeks(new Date(), -1), { weekStartsOn: 1 });
+
+    const weekCompletions = await prisma.completion.findMany({
       where: {
-        userId: user.id,
-        completed: false,
-        dueDate: { gte: now },
+        completedAt: { gte: start, lte: end }
       },
-      include: {
-        task: true,
-        schedule: true,
-      },
-      orderBy: { dueDate: 'asc' },
-      take: 5,
+      include: { task: true, user: true }
     });
+
+    const lastWeekCompletions = await prisma.completion.findMany({
+      where: {
+        completedAt: { gte: lastStart, lte: lastEnd }
+      },
+      include: { task: true, user: true }
+    });
+
+    // Calculate pending/completed tasks for ON DUTY user specifically this week
+    const dutyCompletions = weekCompletions.filter(c => c.userId === onDutyUser?.id);
+    const completedTaskIds = new Set(dutyCompletions.map(c => c.taskId));
+    
+    const pendingTasksCount = activeTasks.length - completedTaskIds.size;
+    const completedTasksCount = completedTaskIds.size;
 
     return NextResponse.json({
-      totalTasks,
-      completedTasks,
-      pendingTasks,
-      overdueTasks,
-      totalUsers,
-      completionRate,
-      recentCompletions,
-      upcomingAssignments,
+      totalTasks: activeTasks.length,
+      completedTasks: completedTasksCount,
+      pendingTasks: pendingTasksCount,
+      overdueTasks: 0, // Simplified for now
+      totalUsers: await prisma.user.count(),
+      completionRate: activeTasks.length > 0 ? Math.round((completedTasksCount / activeTasks.length) * 100) : 0,
+      recentCompletions: weekCompletions,
+      lastWeekCompletions,
+      currentDutyUser: onDutyUser,
+      isUserOnDuty,
+      activeTasks, // Return active tasks for checkboxes
     });
   } catch (error) {
     console.error('Get stats error:', error);

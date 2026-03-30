@@ -64,6 +64,16 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see the application.
+ 
+## Admin Access
+ 
+To manage the kitchen rota, use the following default administrator credentials:
+ 
+- **Email**: `admin@kitchenrota.com`
+- **Password**: `adminpassword123`
+ 
+> [!IMPORTANT]
+> Change these credentials after your first login for better security.
 
 ## Available Scripts
 

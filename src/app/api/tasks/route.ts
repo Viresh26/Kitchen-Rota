@@ -7,8 +7,7 @@ import { z } from 'zod';
 const taskSchema = z.object({
   name: z.string().min(1, 'Task name is required'),
   description: z.string().optional(),
-  frequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).default('WEEKLY'),
-  duration: z.number().int().positive().default(30),
+  frequency: z.enum(['DAILY', 'TWICE_WEEKLY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).default('WEEKLY'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM'),
   active: z.boolean().default(true),
 });
@@ -28,7 +27,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, name: true, email: true },
         },
         _count: {
-          select: { assignments: true, completions: true },
+          select: { completions: true },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -48,8 +47,8 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 401 });
     }
 
     const body = await request.json();

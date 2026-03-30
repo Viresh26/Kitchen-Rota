@@ -3,6 +3,9 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 
+import AppLayout from '@/components/AppLayout';
+import CookieBanner from '@/components/CookieBanner';
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
@@ -16,9 +19,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        {children}
+        <AppLayout>
+          {children}
+        </AppLayout>
+        <CookieBanner />
         <Toaster
           position="top-right"
           toastOptions={{

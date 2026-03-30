@@ -7,8 +7,7 @@ import { z } from 'zod';
 const taskSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
-  frequency: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
-  duration: z.number().int().positive().optional(),
+  frequency: z.enum(['DAILY', 'TWICE_WEEKLY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
   active: z.boolean().optional(),
 });
@@ -31,12 +30,6 @@ export async function GET(
       include: {
         createdBy: {
           select: { id: true, name: true, email: true },
-        },
-        assignments: {
-          include: {
-            user: { select: { id: true, name: true, email: true } },
-            schedule: true,
-          },
         },
         completions: {
           include: {
@@ -69,8 +62,8 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 401 });
     }
 
     const { id } = await params;
@@ -119,8 +112,8 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized. Admin only.' }, { status: 401 });
     }
 
     const { id } = await params;

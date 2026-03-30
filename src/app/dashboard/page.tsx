@@ -1,36 +1,69 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { formatDate, getPriorityColor, getFrequencyLabel } from '@/utils/helpers';
-import type { DashboardStats, Completion, Assignment } from '@/types';
+import { Button } from '@/components/ui/Button';
+import { formatDate, cn } from '@/utils/helpers';
+import type { CleaningTask, Completion } from '@/types';
+import toast from 'react-hot-toast';
+
+interface DashboardData {
+  totalTasks: number;
+  completedTasks: number;
+  pendingTasks: number;
+  totalUsers: number;
+  completionRate: number;
+  recentCompletions: Completion[];
+  lastWeekCompletions: Completion[];
+  currentDutyUser: { id: string; name: string; roomNumber: number } | null;
+  isUserOnDuty: boolean;
+  activeTasks: CleaningTask[];
+}
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentCompletions, setRecentCompletions] = useState<Completion[]>([]);
-  const [upcomingAssignments, setUpcomingAssignments] = useState<Assignment[]>([]);
+  const { data: session } = useSession();
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        const response = await fetch('/api/stats');
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data);
-          setRecentCompletions(data.recentCompletions || []);
-          setUpcomingAssignments(data.upcomingAssignments || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchStats();
+    fetchDashboardData();
   }, []);
+
+  async function fetchDashboardData() {
+    try {
+      const response = await fetch('/api/stats');
+      if (response.ok) {
+        setData(await response.json());
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function toggleTask(taskId: string, isCompleted: boolean) {
+    if (!data?.isUserOnDuty) return;
+
+    try {
+      if (!isCompleted) {
+        const response = await fetch('/api/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId }),
+        });
+
+        if (response.ok) {
+          toast.success('Task marked as completed');
+          fetchDashboardData();
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to update task');
+    }
+  }
 
   if (loading) {
     return (
@@ -40,154 +73,115 @@ export default function DashboardPage() {
     );
   }
 
+  const isCompleted = (taskId: string) => 
+    data?.recentCompletions.some(c => c.taskId === taskId && c.user?.id === data.currentDutyUser?.id);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-neutral-900">Dashboard</h1>
-        <p className="text-neutral-600 mt-1">Welcome back! Here&apos;s an overview of your cleaning responsibilities.</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="bg-gradient-to-br from-primary-500 to-primary-600 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-primary-100 text-sm">Total Tasks</p>
-              <p className="text-3xl font-bold mt-1">{stats?.totalTasks || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-green-100 text-sm">Completed</p>
-              <p className="text-3xl font-bold mt-1">{stats?.completedTasks || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-yellow-100 text-sm">Pending</p>
-              <p className="text-3xl font-bold mt-1">{stats?.pendingTasks || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-red-100 text-sm">Overdue</p>
-              <p className="text-3xl font-bold mt-1">{stats?.overdueTasks || 0}</p>
-            </div>
-            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Completion Rate */}
-      <Card title="Completion Rate" description="Your overall task completion progress">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-neutral-600">Progress</span>
-              <span className="text-sm font-medium text-neutral-900">{stats?.completionRate || 0}%</span>
-            </div>
-            <div className="w-full bg-neutral-200 rounded-full h-3">
-              <div
-                className="bg-primary rounded-full h-3 transition-all duration-500"
-                style={{ width: `${stats?.completionRate || 0}%` }}
-              />
-            </div>
-          </div>
-          <div className="text-4xl font-bold text-primary">{stats?.completionRate || 0}%</div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900">Kitchen Dashboard</h1>
+          <p className="text-neutral-600 mt-1">Weekly duty overview and task tracking.</p>
         </div>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Assignments */}
-        <Card title="Upcoming Tasks" description="Tasks assigned to you">
-          {upcomingAssignments.length === 0 ? (
-            <p className="text-neutral-500 text-center py-8">No upcoming tasks</p>
-          ) : (
-            <div className="space-y-3">
-              {upcomingAssignments.map((assignment) => (
-                <div
-                  key={assignment.id}
-                  className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-neutral-900">{assignment.task?.name || 'Task'}</p>
-                    <p className="text-sm text-neutral-500">
-                      Due {formatDate(assignment.dueDate)} • {assignment.task ? getFrequencyLabel(assignment.task.frequency) : ''}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      assignment.task?.priority === 'HIGH'
-                        ? 'danger'
-                        : assignment.task?.priority === 'MEDIUM'
-                        ? 'warning'
-                        : 'success'
-                    }
-                  >
-                    {assignment.task?.priority || 'MEDIUM'}
-                  </Badge>
-                </div>
-              ))}
+        <Card className="bg-primary-50 border-primary-100 py-3 px-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center">
+              <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
             </div>
-          )}
+            <div>
+              <p className="text-xs text-primary-600 font-semibold uppercase tracking-wider">This Week's Duty</p>
+              <p className="text-lg font-bold text-primary-900">
+                {data?.currentDutyUser ? `${data.currentDutyUser.name} (Room ${data.currentDutyUser.roomNumber})` : 'No one assigned'}
+              </p>
+            </div>
+          </div>
         </Card>
+      </div>
 
-        {/* Recent Completions */}
-        <Card title="Recent Completions" description="Your completed tasks">
-          {recentCompletions.length === 0 ? (
-            <p className="text-neutral-500 text-center py-8">No recent completions</p>
-          ) : (
-            <div className="space-y-3">
-              {recentCompletions.map((completion) => (
-                <div
-                  key={completion.id}
-                  className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-neutral-900">{completion.task?.name || 'Task'}</p>
-                    <p className="text-sm text-neutral-500">
-                      Completed {formatDate(completion.completedAt)}
-                    </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Task Checklist */}
+        <Card className="lg:col-span-2" title="Weekly Tasks" description={data?.isUserOnDuty ? "It's your duty this week! Mark tasks as you complete them." : `Check the status of tasks for room ${data?.currentDutyUser?.roomNumber}.`}>
+          <div className="space-y-4">
+            {data?.activeTasks.map((task) => (
+              <div key={task.id} className="flex items-center justify-between p-4 bg-neutral-50 rounded-xl border border-neutral-100 hover:border-primary-200 transition-colors">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="relative flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={isCompleted(task.id)}
+                      onChange={() => toggleTask(task.id, !!isCompleted(task.id))}
+                      disabled={!data.isUserOnDuty || isCompleted(task.id)}
+                      className="w-6 h-6 rounded border-neutral-300 text-primary focus:ring-primary disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                    />
                   </div>
-                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
+                  <div>
+                    <p className={cn("font-semibold text-neutral-900", isCompleted(task.id) && "line-through text-neutral-400")}>
+                      {task.name}
+                    </p>
+                    {task.description && <p className="text-sm text-neutral-500">{task.description}</p>}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+                <Badge variant={isCompleted(task.id) ? "success" : "warning"}>
+                  {isCompleted(task.id) ? "Completed" : "Pending"}
+                </Badge>
+              </div>
+            ))}
+          </div>
         </Card>
+
+        {/* Stats & Progress */}
+        <div className="space-y-6">
+          <Card title="Duty Progress">
+            <div className="space-y-4 pt-2">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-sm text-neutral-500 mb-1">Completion Rate</p>
+                  <p className="text-3xl font-bold text-neutral-900">{data?.completionRate}%</p>
+                </div>
+                <p className="text-sm font-medium text-primary">
+                  {data?.completedTasks} / {data?.totalTasks} Tasks
+                </p>
+              </div>
+              <div className="w-full bg-neutral-100 rounded-full h-3">
+                <div 
+                  className="bg-primary h-3 rounded-full transition-all duration-700" 
+                  style={{ width: `${data?.completionRate}%` }}
+                />
+              </div>
+            </div>
+          </Card>
+
+          <Card title="History" description="Team completions over the last 2 weeks">
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">This Week</h4>
+                {data?.recentCompletions.slice(0, 3).map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <p className="text-sm text-neutral-700 truncate flex-1">
+                      <span className="font-medium text-neutral-900">Room {c.user?.roomNumber}</span> completed <span className="text-neutral-600">{c.task?.name}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="pt-2">
+                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-3">Last Week</h4>
+                {data?.lastWeekCompletions.slice(0, 3).map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-neutral-300" />
+                    <p className="text-sm text-neutral-500 truncate flex-1">
+                      Room {c.user?.roomNumber} completed {c.task?.name}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );
 }
+

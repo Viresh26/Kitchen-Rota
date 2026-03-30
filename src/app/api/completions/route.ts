@@ -3,9 +3,11 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { startOfWeek, endOfWeek } from 'date-fns';
 
 const completionSchema = z.object({
-  assignmentId: z.string(),
+  assignmentId: z.string().optional(),
+  taskId: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -29,12 +31,7 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         task: true,
-        user: { select: { id: true, name: true, email: true } },
-        assignment: {
-          include: {
-            schedule: true,
-          },
-        },
+        user: { select: { id: true, name: true, email: true, roomNumber: true } } as any,
       },
       orderBy: { completedAt: 'desc' },
     });
@@ -75,34 +72,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Get the assignment
-    const assignment = await prisma.assignment.findUnique({
-      where: { id: validation.data.assignmentId },
-      include: { task: true },
-    });
+    const { taskId, notes } = validation.data;
 
-    if (!assignment) {
-      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 });
+    if (!taskId) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 });
     }
 
-    // Create completion record
+    // Check if task exists
+    const task = await prisma.cleaningTask.findUnique({
+      where: { id: taskId }
+    });
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    // Create completion record directly
     const completion = await prisma.completion.create({
       data: {
-        assignmentId: validation.data.assignmentId,
-        taskId: assignment.taskId,
+        taskId: taskId,
         userId: user.id,
-        notes: validation.data.notes,
+        notes: notes,
       },
       include: {
         task: true,
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, roomNumber: true } } as any,
       },
-    });
-
-    // Update assignment status
-    await prisma.assignment.update({
-      where: { id: validation.data.assignmentId },
-      data: { completed: true },
     });
 
     return NextResponse.json(completion, { status: 201 });

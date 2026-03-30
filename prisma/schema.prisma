@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -10,20 +8,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model for authentication and user management
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String         @id @default(cuid())
+  email         String         @unique
   name          String
   password      String
-  role          Role      @default(USER)
+  role          Role           @default(USER)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  assignments   Assignment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  roomNumber    Int?           @unique
+  createdTasks  CleaningTask[] @relation("TaskCreator")
   completions   Completion[]
   notifications Notification[]
-  createdTasks  CleaningTask[] @relation("TaskCreator")
+}
+
+model CleaningTask {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  frequency   Frequency    @default(WEEKLY)
+  priority    Priority     @default(MEDIUM)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdById String
+  createdBy   User         @relation("TaskCreator", fields: [createdById], references: [id])
+  completions Completion[]
+}
+
+model Completion {
+  id           String       @id @default(cuid())
+  taskId       String
+  userId       String
+  completedAt  DateTime     @default(now())
+  notes        String?
+  verified     Boolean      @default(false)
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  user         User         @relation(fields: [userId], references: [id])
+  task         CleaningTask @relation(fields: [taskId], references: [id])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  link      String?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
 }
 
 enum Role {
@@ -31,25 +75,9 @@ enum Role {
   ADMIN
 }
 
-// Cleaning task definitions
-model CleaningTask {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  frequency   Frequency @default(WEEKLY)
-  duration    Int      @default(30) // Estimated duration in minutes
-  priority    Priority @default(MEDIUM)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdById String
-  createdBy   User     @relation("TaskCreator", fields: [createdById], references: [id])
-  assignments Assignment[]
-  completions Completion[]
-}
-
 enum Frequency {
   DAILY
+  TWICE_WEEKLY
   WEEKLY
   BIWEEKLY
   MONTHLY
@@ -61,20 +89,6 @@ enum Priority {
   HIGH
 }
 
-// Schedule for organizing cleaning rotations
-model Schedule {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  startDate   DateTime
-  endDate     DateTime?
-  rotationType RotationType @default(WEEKLY)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  assignments Assignment[]
-}
-
 enum RotationType {
   DAILY
   WEEKLY
@@ -82,67 +96,9 @@ enum RotationType {
   MONTHLY
 }
 
-// Assignment of tasks to users within a schedule
-model Assignment {
-  id        String   @id @default(cuid())
-  taskId    String
-  task      CleaningTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scheduleId String
-  schedule  Schedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  dueDate   DateTime
-  completed Boolean  @default(false)
-  verified  Boolean  @default(false)
-  verifiedBy String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  completions Completion[]
-
-  @@unique([taskId, userId, dueDate])
-}
-
-// Task completion records
-model Completion {
-  id            String   @id @default(cuid())
-  assignmentId  String
-  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
-  taskId        String
-  task          CleaningTask @relation(fields: [taskId], references: [id])
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  completedAt   DateTime @default(now())
-  notes         String?
-  verified      Boolean  @default(false)
-  verifiedBy    String?
-  verifiedAt    DateTime?
-}
-
-// Notification system
-model Notification {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String
-  message   String
-  type      NotificationType @default(INFO)
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  link      String?
-}
-
 enum NotificationType {
   INFO
   REMINDER
   WARNING
   SUCCESS
-}
-
-// Settings for application configuration
-model Settings {
-  id              String   @id @default(cuid())
-  key             String   @unique
-  value           String
-  description     String?
-  updatedAt       DateTime @updatedAt
 }
