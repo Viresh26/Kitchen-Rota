@@ -93,14 +93,22 @@ Based on the project name and initial setup, the following functionalities are i
 
 ### Backend
 - **Runtime:** Node.js
-- **Database:** SQLite (development), PostgreSQL/MySQL (production recommended)
+- **Database:** SQLite (local development), PostgreSQL (required for Heroku production)
 - **ORM:** Prisma
 - **Authentication:** To be determined
 
-### Infrastructure
+### Infrastructure & Deployment
 - **Version Control:** Git
 - **Package Manager:** npm
 - **Environment:** dotenv
+- **Hosting Platform:** Heroku
+
+### Heroku Deployment Requirements
+- **Procfile:** Required to define the dyno start command (e.g., `web: npm start`).
+- **Dynamic Port Binding:** The application must bind to `process.env.PORT` provided by Heroku.
+- **Database Support:** Heroku's filesystem is ephemeral. SQLite cannot be used in production; Heroku Postgres add-on is mandatory.
+- **File Storage:** Any uploaded files or images must be stored in external cloud storage (e.g., AWS S3, Cloudinary). Local file uploads will be lost when dynos restart.
+- **Build & Release Steps:** `package.json` must include proper build scripts, and Prisma migrations (e.g., `npx prisma migrate deploy`) should run in the release phase.
 
 ---
 
@@ -171,10 +179,14 @@ kitchen-rota/
    - [ ] Implement calendar components
    - [ ] Add notification system
 
-6. **Testing & Deployment**
+6. **Testing & Deployment (Heroku)**
    - [ ] Write unit and integration tests
-   - [ ] Set up CI/CD pipeline
-   - [ ] Deploy to production environment
+   - [ ] Create a `Procfile` for Heroku web/release dynos
+   - [ ] Provision Heroku Postgres database add-on
+   - [ ] Configure environment variables in Heroku Dashboard (Config Vars)
+   - [ ] Set up proper build/start scripts in `package.json`
+   - [ ] Set up CI/CD pipeline (e.g., GitHub Actions to Heroku or automatic Heroku deploys)
+   - [ ] Deploy to Heroku production environment
 
 ---
 
