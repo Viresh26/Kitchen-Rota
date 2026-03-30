@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
-import bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt-ts';
 import { z } from 'zod';
 
 export const runtime = 'edge';
