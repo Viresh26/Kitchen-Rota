@@ -1,7 +1,7 @@
 name = "kitchen-rota"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
-pages_build_output_dir = ".next"
+pages_build_output_dir = ".vercel/output"
 
 [[d1_databases]]
 binding = "DB"
