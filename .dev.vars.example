@@ -1,0 +1,11 @@
+# Environment variables for local development with Wrangler
+# Copy this to .dev.vars for local testing
+
+# NextAuth Configuration
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-key-here"
+
+# Database binding (matches wrangler.toml)
+# D1 Database is accessed via env.DB in code
+
+NODE_ENV="development"

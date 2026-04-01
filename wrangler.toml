@@ -6,4 +6,4 @@ pages_build_output_dir = ".vercel/output/static"
 [[d1_databases]]
 binding = "DB"
 database_name = "kitchen-rota-db"
-database_id = "YOUR_D1_DATABASE_ID" # User needs to fill this after creation
+database_id = "ce6502d2-2f6b-4041-be71-bd8c6886e375"
