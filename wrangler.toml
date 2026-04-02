@@ -4,6 +4,6 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".vercel/output/static"
 
 [[d1_databases]]
-binding = "DB"
+binding = "kitchen_rota_db"
 database_name = "kitchen-rota-db"
-database_id = "ce6502d2-2f6b-4041-be71-bd8c6886e375"
+database_id = "99124bfd-b257-4748-a220-e77a5793e7b0"
